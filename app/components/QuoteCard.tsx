@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import type { Quote } from "@/types";
 
 interface QuoteCardProps {
   quote: Quote;
 }
 
-export default function QuoteCard({ quote }: QuoteCardProps) {
+const QuoteCard = memo(function QuoteCard({ quote }: QuoteCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -65,4 +65,6 @@ export default function QuoteCard({ quote }: QuoteCardProps) {
       )}
     </div>
   );
-}
+});
+
+export default QuoteCard;

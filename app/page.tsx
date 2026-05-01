@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue, startTransition } from "react";
 import type { ScrapeResult, ApiResponse } from "@/types";
 import QuoteCard from "./components/QuoteCard";
 import SearchFilter from "./components/SearchFilter";
@@ -14,6 +14,9 @@ export default function Home() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const mountedRef = useRef(false);
+
+  const deferredSearch = useDeferredValue(search);
+  const deferredTags = useDeferredValue(selectedTags);
   const { theme, toggleTheme } = useTheme();
 
   const fetchQuotes = useCallback(async () => {
@@ -53,26 +56,35 @@ export default function Home() {
     return Array.from(tagSet).sort();
   }, [data]);
 
+  const handleSearchChange = useCallback((value: string) => {
+    startTransition(() => {
+      setSearch(value);
+    });
+  }, []);
+
   const handleTagToggle = useCallback((tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
+    startTransition(() => {
+      setSelectedTags((prev) =>
+        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+      );
+    });
   }, []);
 
   const filteredQuotes = useMemo(() => {
     if (!data) return [];
+    const lowerSearch = deferredSearch.toLowerCase();
+    const quoteTags = deferredTags;
     return data.quotes.filter((quote) => {
-      const lowerSearch = search.toLowerCase();
       const matchesSearch =
-        search === "" ||
+        deferredSearch === "" ||
         quote.text.toLowerCase().includes(lowerSearch) ||
         quote.author.toLowerCase().includes(lowerSearch);
       const matchesTags =
-        selectedTags.length === 0 ||
-        selectedTags.every((tag) => quote.tags.includes(tag));
+        quoteTags.length === 0 ||
+        quoteTags.every((tag) => quote.tags.includes(tag));
       return matchesSearch && matchesTags;
     });
-  }, [data, search, selectedTags]);
+  }, [data, deferredSearch, deferredTags]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -163,7 +175,7 @@ export default function Home() {
       {data && (
         <SearchFilter
           search={search}
-          onSearchChange={setSearch}
+          onSearchChange={handleSearchChange}
           allTags={allTags}
           selectedTags={selectedTags}
           onTagToggle={handleTagToggle}
@@ -190,9 +202,11 @@ export default function Home() {
             <button
               className="px-4 py-2 border border-[var(--border-color)] text-[var(--text-secondary)] rounded hover:bg-[var(--bg-secondary)] transition-colors"
               onClick={() => {
-                setSearch("");
-                setSelectedTags([]);
-                setCurrentPage(1);
+                startTransition(() => {
+                  setSearch("");
+                  setSelectedTags([]);
+                  setCurrentPage(1);
+                });
               }}
             >
               Clear filters
@@ -214,14 +228,14 @@ export default function Home() {
           </p>
           <div className="flex gap-2">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => startTransition(() => setCurrentPage((p) => Math.max(1, p - 1)))}
               disabled={currentPage === 1}
               className="px-3 py-1.5 text-sm border border-[var(--border-color)] rounded text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Previous
             </button>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => startTransition(() => setCurrentPage((p) => Math.min(totalPages, p + 1)))}
               disabled={currentPage === totalPages}
               className="px-3 py-1.5 text-sm border border-[var(--border-color)] rounded text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
