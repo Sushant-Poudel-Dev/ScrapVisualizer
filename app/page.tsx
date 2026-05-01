@@ -12,6 +12,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const mountedRef = useRef(false);
   const { theme, toggleTheme } = useTheme();
 
@@ -73,6 +74,17 @@ export default function Home() {
     });
   }, [data, search, selectedTags]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedTags]);
+
+  const quotesPerPage = 50;
+  const totalPages = Math.ceil(filteredQuotes.length / quotesPerPage);
+  const paginatedQuotes = useMemo(() => {
+    const start = (currentPage - 1) * quotesPerPage;
+    return filteredQuotes.slice(start, start + quotesPerPage);
+  }, [filteredQuotes, currentPage]);
+
   const formattedDate = data
     ? new Date(data.lastUpdated).toLocaleString(undefined, {
         month: "short",
@@ -94,7 +106,13 @@ export default function Home() {
           </h1>
           {data && (
             <p className="text-[var(--text-secondary)] text-sm">
-              {data.totalQuotes} quotes from {data.totalAuthors} authors · Updated {formattedDate}
+              {loading ? (
+                <>Fetching updated quotes...</>
+              ) : (
+                <>
+                  {data.totalQuotes} quotes from {data.totalAuthors} authors · Updated {formattedDate}
+                </>
+              )}
             </p>
           )}
         </div>
@@ -113,7 +131,19 @@ export default function Home() {
             aria-busy={loading}
             aria-label="Refresh quotes"
           >
-            {loading ? "..." : "↻"}
+            <svg
+              className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
           </button>
         </div>
       </header>
@@ -140,13 +170,14 @@ export default function Home() {
         />
       )}
 
-      {loading && (
+      {loading && !data && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-live="polite">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 animate-pulse">
+            <div key={i} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5">
               <div className="h-4 bg-[var(--border-color)] rounded mb-3" />
               <div className="h-4 bg-[var(--border-color)] rounded w-3/4 mb-3" />
-              <div className="h-4 bg-[var(--border-color)] rounded w-1/2" />
+              <div className="h-4 bg-[var(--border-color)] rounded w-1/2 mb-4" />
+              <div className="h-3 bg-[var(--border-color)] rounded w-1/3" />
             </div>
           ))}
         </div>
@@ -161,6 +192,7 @@ export default function Home() {
               onClick={() => {
                 setSearch("");
                 setSelectedTags([]);
+                setCurrentPage(1);
               }}
             >
               Clear filters
@@ -170,10 +202,34 @@ export default function Home() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredQuotes.map((quote, index) => (
+        {paginatedQuotes.map((quote, index) => (
           <QuoteCard key={`${quote.author}-${index}`} quote={quote} />
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-8 pt-4 border-t border-[var(--border-color)]">
+          <p className="text-[var(--text-muted)] text-sm">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm border border-[var(--border-color)] rounded text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm border border-[var(--border-color)] rounded text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
