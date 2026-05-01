@@ -7,14 +7,19 @@ const USERNAME = process.env.SCRAPE_USERNAME;
 const PASSWORD = process.env.SCRAPE_PASSWORD;
 
 async function scrapeQuotes(): Promise<ScrapeResult> {
-  // Validate env vars before doing anything
   if (!BASE_URL || !USERNAME || !PASSWORD) {
     throw new Error(
       "Missing required environment variables: SCRAPE_URL, SCRAPE_USERNAME, SCRAPE_PASSWORD",
     );
   }
 
-  const browser = await chromium.launch({ headless: true });
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+  } catch (err) {
+    throw new Error(`Failed to launch browser: ${err instanceof Error ? err.message : "Unknown error"}`);
+  }
+
   const context = await browser.newContext();
   const page = await context.newPage();
 

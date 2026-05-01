@@ -1,65 +1,179 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import type { ScrapeResult, ApiResponse } from "@/types";
+import QuoteCard from "./components/QuoteCard";
+import SearchFilter from "./components/SearchFilter";
+import { useTheme } from "./components/ThemeProvider";
 
 export default function Home() {
+  const [data, setData] = useState<ScrapeResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const mountedRef = useRef(false);
+  const { theme, toggleTheme } = useTheme();
+
+  const fetchQuotes = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/scrape");
+
+      if (!res.ok) {
+        throw new Error(`Server responded with status ${res.status}`);
+      }
+
+      const json: ApiResponse = await res.json();
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error ?? "Unexpected response from server");
+      }
+
+      setData(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+    fetchQuotes();
+  }, [fetchQuotes]);
+
+  const allTags = useMemo(() => {
+    if (!data) return [];
+    const tagSet = new Set(data.quotes.flatMap((q) => q.tags));
+    return Array.from(tagSet).sort();
+  }, [data]);
+
+  const handleTagToggle = useCallback((tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  }, []);
+
+  const filteredQuotes = useMemo(() => {
+    if (!data) return [];
+    return data.quotes.filter((quote) => {
+      const lowerSearch = search.toLowerCase();
+      const matchesSearch =
+        search === "" ||
+        quote.text.toLowerCase().includes(lowerSearch) ||
+        quote.author.toLowerCase().includes(lowerSearch);
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.every((tag) => quote.tags.includes(tag));
+      return matchesSearch && matchesTags;
+    });
+  }, [data, search, selectedTags]);
+
+  const formattedDate = data
+    ? new Date(data.lastUpdated).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="max-w-5xl mx-auto px-6 py-10 md:px-8 md:py-12">
+      <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 mb-8">
+        <div className="flex-1">
+          <span className="block text-xs uppercase tracking-widest text-[var(--text-muted)] font-semibold mb-2">
+            Curated Collection
+          </span>
+          <h1 className="font-serif text-4xl md:text-5xl text-[var(--text-primary)] mb-2">
+            Quote Dashboard
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          {data && (
+            <p className="text-[var(--text-secondary)] text-sm">
+              {data.totalQuotes} quotes from {data.totalAuthors} authors · Updated {formattedDate}
+            </p>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="flex gap-3">
+          <button
+            onClick={toggleTheme}
+            className="px-4 py-3 border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+            aria-label="Toggle theme"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            {theme === "light" ? "🌙" : "☀️"}
+          </button>
+          <button
+            className="p-3 text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded-lg transition-colors disabled:opacity-50"
+            onClick={fetchQuotes}
+            disabled={loading}
+            aria-busy={loading}
+            aria-label="Refresh quotes"
           >
-            Documentation
-          </a>
+            {loading ? "..." : "↻"}
+          </button>
         </div>
-      </main>
-    </div>
+      </header>
+
+      {error && (
+        <div className="flex items-center gap-4 p-4 mb-6 bg-red-500/20 border border-red-500/50 rounded-lg" role="alert">
+          <p className="text-[var(--text-primary)]">{error}</p>
+          <button
+            className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+            onClick={fetchQuotes}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {data && (
+        <SearchFilter
+          search={search}
+          onSearchChange={setSearch}
+          allTags={allTags}
+          selectedTags={selectedTags}
+          onTagToggle={handleTagToggle}
+        />
+      )}
+
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-live="polite">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-5 animate-pulse">
+              <div className="h-4 bg-[var(--border-color)] rounded mb-3" />
+              <div className="h-4 bg-[var(--border-color)] rounded w-3/4 mb-3" />
+              <div className="h-4 bg-[var(--border-color)] rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && filteredQuotes.length === 0 && data && (
+        <div className="text-center py-16 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg">
+          <p className="text-[var(--text-secondary)] mb-4">No quotes found</p>
+          {(search || selectedTags.length > 0) && (
+            <button
+              className="px-4 py-2 border border-[var(--border-color)] text-[var(--text-secondary)] rounded hover:bg-[var(--bg-secondary)] transition-colors"
+              onClick={() => {
+                setSearch("");
+                setSelectedTags([]);
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredQuotes.map((quote, index) => (
+          <QuoteCard key={`${quote.author}-${index}`} quote={quote} />
+        ))}
+      </div>
+    </main>
   );
 }
