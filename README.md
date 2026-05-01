@@ -2,7 +2,7 @@
 
 A modern Next.js web application for browsing, searching, and filtering inspirational quotes scraped from external sources. Features a sleek dark/light theme, pagination, copy-to-clipboard, and smooth performance optimizations.
 
-![Quote Dashboard Screenshot](/scrapevisualizer/images/dashboard.png)
+![Quote Dashboard Screenshot](./images/dashboard.png)
 
 ## Features
 
